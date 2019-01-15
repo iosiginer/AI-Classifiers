@@ -57,11 +57,24 @@ def knn_algorithm(current_sample, k = 5):
 def decision_tree_algorithm(current_sample):
         return "dt"
 
+def get_conditional_probability(current_sample_att, attribute, option):
+        return 1
+
 def naive_bayes_algorithm(current_sample):
+        possible_classifications = set([sample[classification_attribute] for sample in train_samples])
+
+        attributes_probabilities = dict()
+        for attribute in current_sample:
+                single_attribute_prob = dict()
+                for option in possible_classifications:
+                        single_attribute_prob[option] = get_conditional_probability(current_sample[attribute], attribute, option)
+                attributes_probabilities[attribute] = single_attribute_prob
+        
+
         return "nb"
 
 def get_all_predictions():
-        prediction_lists_dict = dict([]) 
+        prediction_lists_dict = dict() 
         dt_predictions = nb_predictions = knn_predictions = []
         lines_list = []
         lines_list.append("Num\tDT\tKNN\tnaiveBase")
