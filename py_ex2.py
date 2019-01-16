@@ -1,6 +1,5 @@
 from collections import Counter
 
-
 # region Global variables
 train_file_path = "train.txt"
 test_file_path = "test.txt"
@@ -10,6 +9,14 @@ train_samples = []
 test_samples = []
 classification_attribute = ""
 # endregion 
+
+
+def multiply_list(list):
+        result = 1
+        for item in list:
+                result = result * item
+        return result
+
 
 def get_samples_from_file(file_path):
         samples_as_dicts_list = []
@@ -55,23 +62,55 @@ def knn_algorithm(current_sample, k = 5):
 
 
 def decision_tree_algorithm(current_sample):
+        ## TODO second step in finishing
         return "dt"
 
-def get_conditional_probability(current_sample_att, attribute, option):
-        return 1
+def get_conditional_probability(test_value, attribute, current_class):
+        num_both_happen = float(sum([1 for sample in train_samples if (sample[attribute] == test_value and sample[classification_attribute] == current_class)]))
+        num_class_happens = float(sum([1 for sample in train_samples if sample[classification_attribute] == current_class]))
+        prob_both_happen = num_both_happen / len(train_samples)
+        prob_class_happens = num_class_happens / len(train_samples)
+        conditional_probability = prob_both_happen / prob_class_happens
+        return conditional_probability
+
+
+def dumb_rule(possible_classifications):
+        positive_classifications = ["yes", "true", "positive", "skynet"]
+        for option in positive_classifications:
+                if option.lower() in positive_classifications:
+                        return option
+        return positive_classifications[0]
 
 def naive_bayes_algorithm(current_sample):
-        possible_classifications = set([sample[classification_attribute] for sample in train_samples])
+        possible_classifications = list(set([sample[classification_attribute] for sample in train_samples]))
 
-        attributes_probabilities = dict()
+        # create dictionary of dictionaries of probabilities
+        attributes_probabilities = dict() # keys = attributes, values = probabilities of classification
         for attribute in current_sample:
+                if attribute == classification_attribute: continue
                 single_attribute_prob = dict()
                 for option in possible_classifications:
                         single_attribute_prob[option] = get_conditional_probability(current_sample[attribute], attribute, option)
                 attributes_probabilities[attribute] = single_attribute_prob
         
+        # get a list containing holding a tuple (option, P(option)) for every classification option
+        all_class_probs = []
+        for option in possible_classifications:
+                prob = multiply_list([attributes_probabilities[att][option] for att in attributes_probabilities])
+                option_prob_tuple = (option, prob)
+                all_class_probs.append(option_prob_tuple)
 
-        return "nb"
+        #sort by probability
+        all_class_probs.sort(key=lambda tuple : tuple[1])
+
+        # get the tuple (most_probable, P(most_probable))
+        most_probable_tuple = all_class_probs[-1] 
+        final_classification = most_probable_tuple[0]
+
+        if(prob[1] == (1 / len(possible_classifications)) for prob in all_class_probs): #if all probs are equal
+                final_classification = dumb_rule(possible_classifications)
+
+        return final_classification
 
 def get_all_predictions():
         prediction_lists_dict = dict() 
@@ -89,7 +128,7 @@ def get_all_predictions():
                 nb = naive_bayes_algorithm(sample)
                 nb_predictions.append(nb)
                 
-                line = str(row_num) + dt + knn + nb
+                line = '\t'.join([str(row_num), dt, knn, nb])
                 lines_list.append(line)
                 row_num += 1
         table_as_string = '\n'.join(lines_list)
@@ -108,5 +147,5 @@ if __name__ == "__main__":
         train_samples = get_samples_from_file(train_file_path)
         test_samples = get_samples_from_file(test_file_path)
         classification_attribute = attributes[-1]
-        
+
         predictions_dict = get_all_predictions()
