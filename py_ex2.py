@@ -9,8 +9,15 @@ attributes_to_num_of_types = {}
 train_samples = []
 test_samples = []
 classification_attribute = ""
+ALG_NAIVE_BAYES = "naive bayes"
+ALG_DEC_TREE = "decision tree"
+ALG_KNN = "knn"
+TAB = '\t'
+NEWLINE = '\n'
 # endregion 
 
+
+# region Helping methods
 
 def multiply_list(list):
         result = 1
@@ -19,30 +26,26 @@ def multiply_list(list):
         return result
 
 
-def get_samples_from_file(file_path, get_types = False):
+def get_data_from_file(file_path, get_attributes = False):
         samples_as_dicts_list = []
-        samples = open(file_path, 'r').read().split('\n')
-        for sample in samples[1:]:
+        with open(file_path, 'r') as samples_file:
+                attributes = samples_file.readline().strip(NEWLINE).split(TAB)
+                samples = samples_file.read().split(NEWLINE)
+        for sample in samples:
                 attributes_dict = dict([])
-                sample_values = sample.split('\t')
+                sample_values = sample.split(TAB)
                 for index in range(len(sample_values)):
                         attributes_dict[attributes[index]] = sample_values[index]
                 if (len(attributes_dict) == len(attributes)):        
                         samples_as_dicts_list.append(attributes_dict)
-        if (get_types):
+        if (get_attributes):
                 for att in attributes:
                         types = set()
                         for sample in samples_as_dicts_list:
                                 types.add(sample[att])
-                        attributes_to_num_of_types[att] = len(types)       
+                        attributes_to_num_of_types[att] = len(types)
+                return samples_as_dicts_list, attributes, attributes[-1]      
         return samples_as_dicts_list
-
-
-def get_attributes(file_path):
-        with open(file_path, 'r') as train_file:
-                first_line = train_file.readline()
-                attributes = first_line.strip('\n').split('\t')
-        return attributes
 
 def get_distance_between_samples(current_sample, sample):
         distance = sum([1 for attribute in attributes[:-1] if current_sample[attribute] != sample[attribute]])
@@ -53,6 +56,31 @@ def find_most_frequent_classification(k_closest_neighbours):
         counter = Counter(neighbours_classification)
         return counter.most_common(1)[0][0] # return the most common classification from this tuple
 
+def get_conditional_probability(test_value, attribute, current_class):
+        num_both_happen = float(sum([1 for sample in train_samples if (sample[attribute] == test_value and sample[classification_attribute] == current_class)]))
+        num_class_happens = float(sum([1 for sample in train_samples if sample[classification_attribute] == current_class]))
+        conditional_probability = (num_both_happen + 1) / num_class_happens + attributes_to_num_of_types[attribute]
+        return conditional_probability
+
+
+def dumb_rule(possible_classifications):
+        positive_classifications = ["yes", "true", "positive", "skynet"]
+        for option in positive_classifications:
+                if option.lower() in positive_classifications:
+                        return option
+        return positive_classifications[0]
+
+def calculate_accuracies(prediction_lists):
+        result = []
+        actual_classifications = [sample[classification_attribute] for sample in test_samples]
+        num_of_samples = len(actual_classifications)
+        for list in prediction_lists:
+                good_predictions = sum([1 for index, item in enumerate(list) if item == actual_classifications[index]])
+                result.append(round(float(good_predictions) / num_of_samples, 2))  
+        return result
+# endregion
+
+# region Algorithm methods
 def knn_algorithm(current_sample, k = 5):
         if not (len(current_sample) == len(attributes)):
                 raise AttributeError("The test sample should have the same number of attributes as the training sample")
@@ -72,19 +100,6 @@ def decision_tree_algorithm(current_sample):
         ## TODO second step in finishing
         return "dt"
 
-def get_conditional_probability(test_value, attribute, current_class):
-        num_both_happen = float(sum([1 for sample in train_samples if (sample[attribute] == test_value and sample[classification_attribute] == current_class)]))
-        num_class_happens = float(sum([1 for sample in train_samples if sample[classification_attribute] == current_class]))
-        conditional_probability = (num_both_happen + 1) / num_class_happens + attributes_to_num_of_types[attribute]
-        return conditional_probability
-
-
-def dumb_rule(possible_classifications):
-        positive_classifications = ["yes", "true", "positive", "skynet"]
-        for option in positive_classifications:
-                if option.lower() in positive_classifications:
-                        return option
-        return positive_classifications[0]
 
 def naive_bayes_algorithm(current_sample):
         possible_classifications = list(set([sample[classification_attribute] for sample in train_samples]))
@@ -117,45 +132,33 @@ def naive_bayes_algorithm(current_sample):
 
         return final_classification
 
-def get_all_predictions():
-        prediction_lists_dict = dict() 
-        dt_predictions = []
-        nb_predictions = []
-        knn_predictions = []
-        lines_list = []
-        lines_list.append("Num\tDT\tKNN\tnaiveBase\t\tACTUAL")
+# endregion
+
+if __name__ == "__main__":
+        train_samples, attributes, classification_attribute = get_data_from_file(train_file_path, get_attributes = True)
+        test_samples = get_data_from_file(test_file_path)
+
+        predictions = {ALG_DEC_TREE:[], ALG_KNN:[], ALG_NAIVE_BAYES:[]}
+        lines_list = ["Num\tDT\tKNN\tnaiveBase"]
         row_num = 1
         for sample in test_samples:
                 dt = decision_tree_algorithm(sample)
-                dt_predictions.append(dt)
-
                 knn = knn_algorithm(sample)
-                knn_predictions.append(knn)
-                
                 nb = naive_bayes_algorithm(sample)
-                nb_predictions.append(nb)
+
+                predictions[ALG_DEC_TREE].append(dt)
+                predictions[ALG_KNN].append(knn)
+                predictions[ALG_NAIVE_BAYES].append(nb)
                 
-                line = '\t'.join([str(row_num), dt, knn, nb])
+                line = TAB.join([str(row_num), dt, knn, nb])
                 # REMOVE THIS LINE, JUST FOR TESTING
                 line = line + '\t\t\t\t' + sample[classification_attribute]
                 lines_list.append(line)
                 row_num += 1
-        table_as_string = '\n'.join(lines_list)
+        # get accuracies
+        accuracies = calculate_accuracies([predictions[ALG_DEC_TREE], predictions[ALG_KNN], predictions[ALG_NAIVE_BAYES]])
+        lines_list.append(TAB + TAB.join([str(acc) for acc in accuracies]))
+        table_as_string = NEWLINE.join(lines_list)
 
         with open(output_file_path, 'w') as output_file:
                 output_file.write(table_as_string)
-
-        prediction_lists_dict["KNN"] = knn_predictions
-        prediction_lists_dict["NB"] = nb_predictions
-        prediction_lists_dict["DT"] = dt_predictions
-
-        return prediction_lists_dict
-
-
-if __name__ == "__main__":
-        attributes = get_attributes(train_file_path)
-        train_samples = get_samples_from_file(train_file_path, True)
-        test_samples = get_samples_from_file(test_file_path)
-        classification_attribute = attributes[-1]
-
-        predictions_dict = get_all_predictions()
